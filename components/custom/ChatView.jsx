@@ -146,6 +146,8 @@ function ChatView() {
     }
   }, [id, fetchWorkspaceData]);
 
+  const processedUserPromptRef = useRef("");
+
   // Trigger AI response when last message is from user
   useEffect(() => {
     if (
@@ -153,15 +155,21 @@ function ChatView() {
       messages.length > 0 &&
       messages[messages.length - 1]?.role === "user"
     ) {
-      fetchAiResponse().catch(console.error);
+      const lastUserMsg = messages[messages.length - 1]?.content;
+      // Prevent duplicate generation if this exact user prompt is already processing or was just processed
+      if (processedUserPromptRef.current === `${id}-${messages.length}-${lastUserMsg}`) {
+        return;
+      }
+      processedUserPromptRef.current = `${id}-${messages.length}-${lastUserMsg}`;
+      fetchAiResponse(messages).catch(console.error);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages]);
+  }, [messages, id]);
 
-  const fetchAiResponse = async () => {
+  const fetchAiResponse = async (currentMessages) => {
     setLoading(true);
     try {
-      const promptData = JSON.stringify(messages) + Prompt.CHAT_PROMPT;
+      const promptData = JSON.stringify(currentMessages || messages) + Prompt.CHAT_PROMPT;
       const response = await axios.post("/api/ai-chat", { prompt: promptData });
 
       if (!response?.data || typeof response.data.result !== "string") {
@@ -169,7 +177,7 @@ function ChatView() {
       }
 
       const aiMessage = { role: "ai", content: response.data.result };
-      const updatedMessages = [...(Array.isArray(messages) ? messages : []), aiMessage];
+      const updatedMessages = [...(Array.isArray(currentMessages || messages) ? (currentMessages || messages) : []), aiMessage];
       setMessages(updatedMessages);
 
       await updateMessagesMutation({ messages: updatedMessages, workspaceId: id });
@@ -184,17 +192,19 @@ function ChatView() {
     } catch (error) {
       console.error("Error fetching AI response:", error?.response?.data || error);
 
-      // Show a friendly error message in the chat instead of a silent failure
+      // Show a friendly error message in the chat instead of duplicate calls
       const status = error?.response?.status;
       const isOverload = status === 503 || status === 429 || /503|429|overload|quota|rate.?limit/i.test(error?.message || "");
       const errContent = isOverload
         ? "⚠️ The AI is currently overloaded. Please try again in a few seconds."
         : "⚠️ Something went wrong. Please try your message again.";
 
-      setMessages((prev) => [
-        ...(Array.isArray(prev) ? prev : []),
-        { role: "ai", content: errContent },
-      ]);
+      setMessages((prev) => {
+        const arr = Array.isArray(prev) ? prev : [];
+        // Don't add duplicate error messages if the last one was already this error
+        if (arr[arr.length - 1]?.content === errContent) return arr;
+        return [...arr, { role: "ai", content: errContent }];
+      });
 
       if (isOverload) {
         toast.error("AI is busy — please retry in a moment.", { duration: 4000 });

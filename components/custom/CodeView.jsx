@@ -136,6 +136,8 @@ function CodeView() {
     if (action?.actionType) setActiveTab("preview");
   }, [action]);
 
+  const processedCodePromptRef = useRef("");
+
   // Generate AI code when last message is from user
   useEffect(() => {
     if (
@@ -143,16 +145,22 @@ function CodeView() {
       messages.length > 0 &&
       messages[messages.length - 1]?.role === "user"
     ) {
-      generateAiCode().catch(console.error);
+      const lastUserMsg = messages[messages.length - 1]?.content;
+      // Prevent duplicate generation if this exact user prompt is already processing or was just processed
+      if (processedCodePromptRef.current === `${id}-${messages.length}-${lastUserMsg}`) {
+        return;
+      }
+      processedCodePromptRef.current = `${id}-${messages.length}-${lastUserMsg}`;
+      generateAiCode(messages).catch(console.error);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages]);
+  }, [messages, id]);
 
-  const generateAiCode = async () => {
+  const generateAiCode = async (currentMessages) => {
     if (!id) return;
     setLoading(true);
     try {
-      const promptData = JSON.stringify(messages) + Prompt.CODE_GEN_PROMPT;
+      const promptData = JSON.stringify(currentMessages || messages) + Prompt.CODE_GEN_PROMPT;
       const response = await axios.post("/api/gen-ai-code", { prompt: promptData });
       const aiResponse = response.data || {};
       const mergedFiles = normalizeFiles(aiResponse?.files || {});
