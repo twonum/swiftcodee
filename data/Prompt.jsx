@@ -17,11 +17,11 @@ export default {
   
   MANDATORY ARCHITECTURE & TECH STACK:
   - Framework: React 18+ (Pure Web SPA).
-  - Styling: Tailwind CSS classes for modern, dark-mode, glassmorphism, responsive designs.
-  - Icons: 'lucide-react' (Import as: import { Home, Search, Trophy, Calendar, Bell, Star, Flame, Shield, Users, Clock, ArrowRight, X, Check, Filter } from "lucide-react";).
-  - State & Mock Data: Built-in mock datasets with full state management (useState, useEffect, useMemo) so the app is 100% interactive, rich in content, and fully usable immediately.
+  - Styling: Tailwind CSS classes for modern dark-mode glassmorphism and responsive design.
+  - Icons: 'lucide-react' (Import as: import { Home, Search, Trophy, Calendar, Bell, Star, Flame, Shield, Users, Clock, ArrowRight, X, Check, Filter, Activity, BarChart2 } from "lucide-react";).
   - Main Entry Point: MUST be "/App.js" (NOT "/App.jsx" and NOT "/src/App.js").
-  - Do NOT use React Native, do NOT use react-native-vector-icons, do NOT use non-web packages.
+  - Structure: Write clean, self-contained modular files (around 3 to 6 components total, e.g. "/App.js", "/components/Navbar.js", "/components/Dashboard.js", "/data/mockData.js"). Keep code direct, elegant, and concise so it responds fast without truncation.
+  - Mock Data & State: Include realistic interactive mock data with full state (useState, useEffect) so all tabs, filters, modals, and actions are 100% interactive.
 
   JSON FORMAT SPECIFICATION:
   Return ONLY a valid, parseable JSON object matching this schema. All newlines inside strings must be escaped as "\\n", and double quotes must be properly escaped.
@@ -30,13 +30,10 @@ export default {
     "explanation": "A concise paragraph explaining what the project does and its features.",
     "files": {
       "/App.js": {
-        "code": "import React from 'react';\\nimport './styles.css';\\nexport default function App() {\\n  return (\\n    <div className='p-6 min-h-screen bg-slate-950 text-white'>\\n      <h1 className='text-3xl font-bold'>App Title</h1>\\n    </div>\\n  );\\n}"
-      },
-      "/components/Navbar.js": {
-        "code": "..."
+        "code": "import React, { useState } from 'react';\\nimport './styles.css';\\nexport default function App() {\\n  return (\\n    <div className='p-6 min-h-screen bg-slate-950 text-white'>\\n      <h1 className='text-3xl font-bold'>App Title</h1>\\n    </div>\\n  );\\n}"
       }
     },
-    "generatedFiles": ["/App.js", "/components/Navbar.js"]
+    "generatedFiles": ["/App.js"]
   }
   `,
 };

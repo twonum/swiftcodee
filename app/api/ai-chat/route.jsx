@@ -1,6 +1,9 @@
 import { generateChatText } from "@/configs/AiModel";
 import { NextResponse } from "next/server";
 
+export const maxDuration = 60; // Allow up to 60s for AI chat on Vercel
+export const dynamic = "force-dynamic";
+
 export async function POST(req) {
   const { prompt } = await req.json();
 
