@@ -8,35 +8,62 @@ import { useRouter } from "next/navigation";
 function SandpankPreviewClient() {
   const previewRef = useRef();
   const { sandpack } = useSandpack();
-  const { action } = useContext(ActionContext);
+  const { action, setAction } = useContext(ActionContext);
   const router = useRouter();
 
   useEffect(() => {
-    if (sandpack) {
-      GetSandpackClient();
-    }
-  }, [sandpack, action]);
+    if (!action?.actionType) return;
+    if (!sandpack) return;
 
-  const GetSandpackClient = async () => {
-    const client = previewRef.current?.getClient();
-    if (client) {
-      console.log(client);
-      const result = await client.getCodeSandboxURL();
-      if (action?.actionType === "deploy") {
-        // Navigate to your custom Deploy Success page with the deploy URL as a query param
-        const deployUrl = `https://${result?.sandboxId}.csb.app/`;
-        router.push(`/deploy-success?url=${encodeURIComponent(deployUrl)}`);
-      } else if (action?.actionType === "export") {
-        window.open(result?.editorUrl);
+    // Wait for the preview iframe to compile before grabbing the URL
+    const timer = setTimeout(() => {
+      handleAction();
+    }, 2000);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [action]);
+
+  const handleAction = async () => {
+    try {
+      const client = previewRef.current?.getClient();
+      if (!client) {
+        console.warn("[SandpackPreview] No client yet.");
+        return;
       }
+
+      const result = await client.getCodeSandboxURL();
+      if (!result?.sandboxId) {
+        console.warn("[SandpackPreview] No sandboxId:", result);
+        return;
+      }
+
+      if (action?.actionType === "deploy") {
+        const deployUrl = `https://${result.sandboxId}.csb.app/`;
+        setAction(null);
+        router.push(`/deploy-success?url=${encodeURIComponent(deployUrl)}&sandbox=${result.sandboxId}`);
+      } else if (action?.actionType === "export") {
+        const editorUrl = result.editorUrl || `https://codesandbox.io/s/${result.sandboxId}`;
+        window.open(editorUrl, "_blank", "noopener,noreferrer");
+        setAction(null);
+      }
+    } catch (err) {
+      console.error("[SandpackPreview] Error:", err);
     }
   };
 
   return (
     <SandpackPreview
       ref={previewRef}
-      style={{ height: "100%", width: "100%" }}
-      showNavigator
+      style={{
+        height: "100%",
+        width: "100%",
+        flexGrow: 1,
+        "--sp-layout-height": "100%",
+      }}
+      showNavigator={true}
+      showOpenInCodeSandbox={true}
+      showRestartButton={true}
     />
   );
 }

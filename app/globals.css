@@ -2,8 +2,62 @@
 @tailwind components;
 @tailwind utilities;
 
+html,
 body {
+  height: 100%;
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Utility: hide scrollbar visually but keep scroll functionality */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ── Sandpack overrides: force preview & editor to fill container ── */
+/* Make the internal Sandpack wrapper fill its parent fully */
+.sp-wrapper,
+.sp-layout {
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+}
+
+/* Preview iframe container */
+.sp-preview-container,
+.sp-preview-iframe,
+.sp-preview {
+  height: 100% !important;
+  min-height: 0 !important;
+  flex: 1 1 0% !important;
+}
+
+/* Code editor — enable vertical scrolling */
+.sp-code-editor,
+.sp-cm,
+.cm-editor,
+.cm-scroller {
+  height: 100% !important;
+  min-height: 0 !important;
+  overflow: auto !important;
+}
+
+/* File explorer: allow full-width names */
+.sp-file-explorer {
+  overflow-x: hidden !important;
+  width: 100% !important;
+}
+
+.sp-file-explorer button,
+.sp-file-explorer a {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 100% !important;
 }
 
 @layer base {

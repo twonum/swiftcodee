@@ -2,7 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Provider from "./provider";
 import ConvexClientProvider from "./ConvexClientProvider";
-import Footer from "./../components/ui/Footer";
+import ConditionalFooter from "./../components/ui/ConditionalFooter";
 import { Toaster } from "sonner";
 
 export const metadata = {
@@ -33,10 +33,13 @@ export default function RootLayout({ children }) {
         <meta name="msapplication-TileImage" content="/ms-icon-144x144.png" />
         <meta name="theme-color" content="#ffffff" />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         <ConvexClientProvider>
-          <Provider>{children}<Toaster /></Provider>
-          <Footer />
+          <Provider>
+            {children}
+            <Toaster />
+          </Provider>
+          <ConditionalFooter />
         </ConvexClientProvider>
       </body>
     </html>

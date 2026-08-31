@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useContext } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Loader } from "lucide-react";
 import SignInDialog from "./SignInDialog";
 import { MessagesContext } from "@/context/MessagesContext";
 import { UserDetailsContext } from "@/context/UserDetailsContext";
@@ -9,7 +9,8 @@ import { api } from "@/convex/_generated/api";
 import { useRouter } from "next/navigation";
 import Colors from "@/data/Colors";
 import Lookup from "@/data/Lookup";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
+import { toast } from "sonner";
 
 // Container variants for the entire hero section.
 const heroContainerVariants = {
@@ -22,7 +23,7 @@ const heroContainerVariants = {
   },
 };
 
-// Variants for the hero heading with an extra dramatic entrance.
+// Variants for the hero heading with entrance.
 const headingVariants = {
   hidden: { opacity: 0, y: -100, rotateX: -45, rotate: -15 },
   visible: {
@@ -44,16 +45,6 @@ const descriptionVariants = {
   },
 };
 
-// Variants for the input container.
-const inputContainerVariants = {
-  hidden: { opacity: 0, scale: 0.7 },
-  visible: {
-    opacity: 1,
-    scale: 1,
-    transition: { delay: 0.6, duration: 1, ease: "easeOut" },
-  },
-};
-
 // Variants for suggestion items.
 const suggestionVariants = {
   hidden: { opacity: 0, x: -100, rotate: -20 },
@@ -65,13 +56,13 @@ const suggestionVariants = {
   },
 };
 
-// Floating decorative blob.
+// Floating decorative blob
 const FloatingBlob = () => (
   <motion.div
-    className="absolute z-[-1] rounded-full"
+    className="absolute z-[-1] rounded-full pointer-events-none"
     style={{
-      width: 200,
-      height: 200,
+      width: 250,
+      height: 250,
       background: "radial-gradient(circle, #adfa1d, transparent)",
     }}
     initial={{ x: -150, y: -100, opacity: 0 }}
@@ -85,7 +76,7 @@ const FloatingBlob = () => (
   />
 );
 
-// Pulsating gradient overlay.
+// Pulsating gradient overlay
 const PulsatingOverlay = () => (
   <motion.div
     className="absolute inset-0 pointer-events-none"
@@ -98,31 +89,39 @@ const PulsatingOverlay = () => (
       ease: "easeInOut",
     }}
     style={{
-      background:
-        "linear-gradient(45deg, rgba(173,250,29,0.2), transparent 70%)",
+      background: "linear-gradient(45deg, rgba(173,250,29,0.2), transparent 70%)",
     }}
   />
 );
 
 function Hero() {
   const [userInput, setUserInput] = useState("");
-  const { messages, setMessages } = useContext(MessagesContext);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const { setMessages } = useContext(MessagesContext);
   const { userDetail } = useContext(UserDetailsContext);
   const [openDialog, setOpenDialog] = useState(false);
   const CreateWorkspace = useMutation(api.workspace.CreateWorkspace);
   const router = useRouter();
 
   const onGenerate = async (input) => {
+    if (isGenerating) return;
+
     if (!userDetail?.name) {
       setOpenDialog(true);
       return;
     }
-    if (userDetail?.token < 10) {
+    if ((userDetail?.token ?? Infinity) < 10) {
       toast.error("You don't have enough tokens to generate a response.");
       return;
     }
-    const msg = { role: "user", content: input };
-    setMessages(msg);
+
+    const trimmedInput = input?.trim();
+    if (!trimmedInput) return;
+
+    setIsGenerating(true);
+    const msg = { role: "user", content: trimmedInput };
+    setMessages([msg]);
+
     try {
       const workspaceId = await CreateWorkspace({
         user: userDetail._id,
@@ -133,6 +132,8 @@ function Hero() {
       router.push(`/workspace/${workspaceId}?new=true`);
     } catch (error) {
       console.error("Error creating workspace:", error);
+      toast.error("Failed to create workspace. Please try again.");
+      setIsGenerating(false);
     }
   };
 
@@ -146,17 +147,16 @@ function Hero() {
       <PulsatingOverlay />
 
       <motion.div
-        className="hero-container flex flex-col items-center gap-4 text-center relative z-10"
+        className="hero-container flex flex-col items-center gap-4 text-center relative z-10 w-full max-w-4xl"
         variants={heroContainerVariants}
         initial="hidden"
         animate="visible"
       >
         <motion.h2
-          className="hero-heading text-4xl sm:text-5xl md:text-6xl font-bold text-[#ADFA1D] shadow-lg"
+          className="hero-heading text-4xl sm:text-5xl md:text-6xl font-bold text-[#ADFA1D] shadow-lg tracking-tight"
           variants={headingVariants}
-          // Removed whileHover to prevent continuous movement on hover
           animate={{
-            textShadow: "0px 0px 20px #ADFA1D",
+            textShadow: "0px 0px 20px rgba(173, 250, 29, 0.4)",
           }}
           transition={{ duration: 1.5, ease: "easeOut" }}
         >
@@ -168,50 +168,69 @@ function Hero() {
         >
           {Lookup.HERO_DESC}
         </motion.p>
-        <motion.div
-          className="input-container p-4 sm:p-5 border rounded-none max-w-2xl w-full mt-3"
-          style={{ backgroundColor: Colors.BACKGROUND }}
-          variants={inputContainerVariants}
-          whileHover={{ boxShadow: "0 0 20px #adfa1d", scale: 1.05 }}
+
+        {/* Input box */}
+        <div
+          className="input-container p-4 sm:p-5 border-2 border-[#ADFA1D]/60 rounded-xl max-w-2xl w-full mt-3 bg-[#0d0d0d] shadow-[0_0_25px_rgba(173,250,29,0.15)] focus-within:border-[#ADFA1D] focus-within:shadow-[0_0_35px_rgba(173,250,29,0.3)] transition-all duration-300"
         >
-          <div className="input-inner flex flex-col sm:flex-row gap-2">
+          <div className="input-inner flex flex-col sm:flex-row gap-2 relative">
             <textarea
               autoComplete="off"
+              disabled={isGenerating}
               onChange={(e) => setUserInput(e.target.value)}
-              className="hero-textarea outline-none bg-transparent resize-none w-full h-28 sm:h-32 md:h-36 max-h-56 text-base text-white"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey && userInput.trim() && !isGenerating) {
+                  e.preventDefault();
+                  onGenerate(userInput);
+                }
+              }}
+              className="hero-textarea outline-none bg-transparent resize-none w-full h-28 sm:h-32 md:h-36 max-h-56 text-base text-white placeholder-gray-500 font-sans"
               placeholder={Lookup.INPUT_PLACEHOLDER}
               value={userInput}
             />
-            {userInput && (
-              <motion.div
-                whileHover={{ scale: 1.3, rotate: 10 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <ArrowRight
+            {userInput.trim() && (
+              <div className="self-end sm:self-auto flex items-end">
+                <button
+                  type="button"
+                  disabled={isGenerating || !userInput.trim()}
                   onClick={() => onGenerate(userInput)}
-                  className="hero-arrow p-2 h-8 w-8 transition duration-200 ease-in-out cursor-pointer bg-[#ADFA1D] text-black"
-                />
-              </motion.div>
+                  className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg font-bold text-sm transition-all duration-200 ${
+                    isGenerating
+                      ? "bg-[#ADFA1D]/50 text-black cursor-not-allowed opacity-80"
+                      : "bg-[#ADFA1D] text-black hover:bg-[#c8ff42] hover:scale-105 active:scale-95 cursor-pointer shadow-lg shadow-[#ADFA1D]/20"
+                  }`}
+                  title="Generate application"
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader className="h-4 w-4 animate-spin text-black" />
+                      <span className="text-xs font-semibold">Creating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ArrowRight className="h-5 w-5 text-black stroke-[2.5]" />
+                    </>
+                  )}
+                </button>
+              </div>
             )}
           </div>
-        </motion.div>
+        </div>
+
+        {/* Suggestion pills */}
         <motion.div
-          className="suggestions-container flex flex-wrap max-w-2xl items-center justify-center gap-3 mt-4"
+          className="suggestions-container flex flex-wrap max-w-2xl items-center justify-center gap-2.5 mt-4"
           variants={suggestionVariants}
         >
           {Lookup.SUGGSTIONS.map((suggestion, index) => (
-            <motion.h2
+            <button
               key={index}
+              disabled={isGenerating}
               onClick={() => onGenerate(suggestion)}
-              className="suggestion-item p-1 px-2 border rounded-none text-xs sm:text-sm text-gray-400 cursor-pointer transition duration-200 ease-in-out"
-              whileHover={{
-                background: "#ffffff",
-                color: "black",
-                boxShadow: "0 0 10px #adfa1d",
-              }}
+              className="suggestion-item p-1.5 px-3 border border-[#ADFA1D]/30 rounded-lg text-xs sm:text-sm text-gray-300 bg-white/5 hover:border-[#ADFA1D] hover:bg-[#ADFA1D]/10 hover:text-[#ADFA1D] transition duration-200 ease-in-out cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {suggestion}
-            </motion.h2>
+            </button>
           ))}
         </motion.div>
       </motion.div>

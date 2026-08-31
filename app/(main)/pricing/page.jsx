@@ -56,12 +56,14 @@ function Pricing() {
   // When a plan is selected, create a checkout session and redirect to Stripe
   const handleSelectPlan = async (planName) => {
     try {
+      const currentUrl = typeof window !== "undefined" ? window.location.pathname : "/pricing";
       const response = await fetch("/api/create-checkout-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           pricingOption: planName,
           userId: userDetail._id,
+          returnUrl: currentUrl,
         }),
       });
       const data = await response.json();

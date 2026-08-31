@@ -24,19 +24,65 @@ export default {
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>SwiftCodee Project</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+      body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    </style>
   </head>
-  <body>
+  <body class="bg-black text-white antialiased selection:bg-[#ADFA1D] selection:text-black">
     <div id="root"></div>
   </body>
 </html>`,
     },
+    "/App.js": {
+      code: `import React, { useState } from "react";
+import "./styles.css";
+
+export default function App() {
+  const [count, setCount] = useState(0);
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white p-6 relative overflow-hidden">
+      {/* Glow effect */}
+      <div className="absolute w-96 h-96 bg-[#ADFA1D]/10 rounded-full blur-3xl pointer-events-none" />
+
+      {/* Main card */}
+      <div className="relative z-10 max-w-md w-full bg-[#0a0a0a] border border-[#ADFA1D]/30 rounded-2xl p-8 shadow-2xl text-center flex flex-col items-center gap-6">
+        <div className="w-16 h-16 rounded-2xl bg-[#ADFA1D]/10 border border-[#ADFA1D]/40 flex items-center justify-center shadow-lg shadow-[#ADFA1D]/10">
+          <span className="text-[#ADFA1D] text-2xl font-extrabold font-mono">SC</span>
+        </div>
+
+        <div className="space-y-2">
+          <h1 className="text-3xl font-extrabold tracking-tight text-white">
+            Workspace <span className="text-[#ADFA1D]">Ready</span>
+          </h1>
+          <p className="text-sm text-gray-400 leading-relaxed">
+            Prompt your ideas in the chat on the left to start generating your full-stack React application in real-time.
+          </p>
+        </div>
+
+        {/* Interactive counter demo */}
+        <div className="w-full bg-white/5 border border-white/10 rounded-xl p-4 flex items-center justify-between">
+          <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">Live Sandbox State</span>
+          <button
+            onClick={() => setCount((prev) => prev + 1)}
+            className="px-3.5 py-1.5 bg-[#ADFA1D] text-black font-bold text-xs rounded-lg hover:bg-[#c8ff42] transition-colors cursor-pointer"
+          >
+            Clicks: {count}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}`,
+    },
+    "/styles.css": {
+      code: `@tailwind base;\n@tailwind components;\n@tailwind utilities;\n`,
+    },
     "/App.css": {
-      code: `
-            @tailwind base;
-@tailwind components;
-@tailwind utilities;`,
+      code: `@tailwind base;\n@tailwind components;\n@tailwind utilities;\n`,
     },
     "/tailwind.config.js": {
       code: `

@@ -150,7 +150,7 @@ function LoginPage() {
       // Save user data locally and in cookies.
       if (typeof window !== "undefined") {
         localStorage.setItem("user", JSON.stringify(user));
-        document.cookie = `auth-token=${user.email}; path=/`;
+        document.cookie = `auth-token=${encodeURIComponent(user.email)}; path=/; max-age=31536000; SameSite=Lax`;
       }
       setUserDetail(user);
 

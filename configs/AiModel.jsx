@@ -1,55 +1,297 @@
-const {
-  GoogleGenerativeAI,
-  HarmCategory,
-  HarmBlockThreshold,
-} = require("@google/generative-ai");
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { jsonrepair } from "jsonrepair";
 
-const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-const genAI = new GoogleGenerativeAI(apiKey);
-
-const model = genAI.getGenerativeModel({
-  model: "gemini-2.0-flash",
-});
-
-const generationConfig = {
-  temperature: 1,
+const CHAT_GENERATION_CONFIG = {
+  temperature: 0.7,
   topP: 0.95,
   topK: 40,
   maxOutputTokens: 8192,
   responseMimeType: "text/plain",
 };
 
-const CodegenerationConfig = {
-  temperature: 1,
+const CODE_GENERATION_CONFIG = {
+  temperature: 0.7,
   topP: 0.95,
   topK: 40,
-  maxOutputTokens: 8192,
+  maxOutputTokens: 65536,
   responseMimeType: "application/json",
 };
 
-export const chatSession = model.startChat({
-  generationConfig,
-  history: [],
-});
+const CANDIDATE_MODELS = Array.from(
+  new Set(
+    [
+      process.env.GEMINI_MODEL,
+      "gemini-3.6-flash",
+    ].filter(Boolean)
+  )
+);
 
-export const GenAiCode = model.startChat({
-  generationConfig: CodegenerationConfig,
-  history: [
-    {
-      role: "user",
-      parts: [
-        {
-          text: 'generate to do app : Generate a Project in React. Create multiple components, organizing them in separate folders with filenames using the .js extension, if needed. The output should use Tailwind CSS for styling, \nwithout any third-party dependencies or libraries, except for icons from the lucide-react library, which should only be used when necessary. Available icons include: Heart, Shield, Clock, Users, Play, Home, Search, Menu, User, Settings, Mail, Bell, Calendar, Star, Upload, Download, Trash, Edit, Plus, Minus, Check, X, and ArrowRight. For example, you can import an icon as import { Heart } from "lucide-react" and use it in JSX as <Heart className="" />.\nalso you can use date-fns for date format and react-chartjs-2 chart, graph library\n\nReturn the response in JSON format with the following schema:\n{\n  "projectTitle": "",\n  "explanation": "",\n  "files": {\n    "/App.js": {\n      "code": ""\n    },\n    ...\n  },\n  "generatedFiles": []\n}\n\nHere’s the reformatted and improved version of your prompt:\n\nGenerate a programming code structure for a React project using Vite. Create multiple components, organizing them in separate folders with filenames using the .js extension, if needed. The output should use Tailwind CSS for styling, without any third-party dependencies or libraries, except for icons from the lucide-react library, which should only be used when necessary. Available icons include: Heart, Shield, Clock, Users, Play, Home, Search, Menu, User, Settings, Mail, Bell, Calendar, Star, Upload, Download, Trash, Edit, Plus, Minus, Check, X, and ArrowRight. For example, you can import an icon as import { Heart } from "lucide-react" and use it in JSX as <Heart className="" />.\n\nReturn the response in JSON format with the following schema:\n\njson\nCopy code\n{\n  "projectTitle": "",\n  "explanation": "",\n  "files": {\n    "/App.js": {\n      "code": ""\n    },\n    ...\n  },\n  "generatedFiles": []\n}\nEnsure the files field contains all created files, and the generatedFiles field lists all the filenames. Each file\'s code should be included in the code field, following this example:\nfiles:{\n  "/App.js": {\n    "code": "import React from \'react\';\\nimport \'./styles.css\';\\nexport default function App() {\\n  return (\\n    <div className=\'p-4 bg-gray-100 text-center\'>\\n      <h1 className=\'text-2xl font-bold text-blue-500\'>Hello, Tailwind CSS with Sandpack!</h1>\\n      <p className=\'mt-2 text-gray-700\'>This is a live code editor.</p>\\n    </div>\\n  );\\n}"\n  }\n}\n  Additionally, include an explanation of the project\'s structure, purpose, and functionality in the explanation field. Make the response concise and clear in one paragraph.\n  - When asked then only use this package to import, here are some packages available to import and use (date-fns,react-chartjs-2,"firebase","@google/generative-ai" ) only when it required\n  \n  - For placeholder images, please use a https://archive.org/download/placeholder-image/placeholder-image.jpg\n  -Add Emoji icons whenever needed to give good user experinence\n  - all designs I ask you to make, have them be beautiful, not cookie cutter. Make webpages that are fully featured and worthy for production.\n\n- By default, this template supports JSX syntax with Tailwind CSS classes, React hooks, and Lucide React for icons. Do not install other packages for UI themes, icons, etc unless absolutely necessary or I request them.\n\n- Use icons from lucide-react for logos.\n\n- Use stock photos from unsplash where appropriate, only valid URLs you know exist. Do not download the images, only link to them in image tags.\n   `,\n\n',
-        },
-      ],
-    },
-    {
-      role: "model",
-      parts: [
-        {
-          text: '```json\n{\n  "projectTitle": "TaskEase: A Feature-Rich To-Do Application",\n  "explanation": "TaskEase is a comprehensive to-do application built with React and styled with Tailwind CSS. It allows users to create, manage, and prioritize their tasks efficiently. The application features multiple components for task listing, task creation, date formatting, and a graphical representation of task completion. It also incorporates icons from lucide-react to enhance user experience and uses date-fns to handle date formatting. The overall structure is designed for scalability and maintainability, with a focus on a clean and intuitive user interface.",\n  "files": {\n    "/App.js": {\n      "code": "import React, { useState, useEffect } from \'react\';\\nimport TaskList from \'./components/TaskList\';\\nimport TaskForm from \'./components/TaskForm\';\\nimport TaskGraph from \'./components/TaskGraph\';\\n\\nfunction App() {\\n  const [tasks, setTasks] = useState(() => {\\n    const savedTasks = localStorage.getItem(\'tasks\');\\n    return savedTasks ? JSON.parse(savedTasks) : [];\\n  });\\n\\n  useEffect(() => {\\n    localStorage.setItem(\'tasks\', JSON.stringify(tasks));\\n  }, [tasks]);\\n\\n  const addTask = (newTask) => {\\n    setTasks([...tasks, newTask]);\\n  };\\n\\n  const deleteTask = (id) => {\\n    setTasks(tasks.filter((task) => task.id !== id));\\n  };\\n\\n  const toggleComplete = (id) => {\\n    setTasks(\\n      tasks.map((task) =>\\n        task.id === id ? { ...task, completed: !task.completed } : task\\n      )\\n    );\\n  };\\n\\n  const completedTasksCount = tasks.filter((task) => task.completed).length;\\n  const incompleteTasksCount = tasks.length - completedTasksCount;\\n\\n  const chartData = {\\n    labels: [\'Completed\', \'Incomplete\'],\\n    datasets: [\\n      {\\n        label: \'Task Completion\',\\n        data: [completedTasksCount, incompleteTasksCount],\\n        backgroundColor: [\'rgba(75, 192, 192, 0.6)\', \'rgba(255, 99, 132, 0.6)\'],\\n        borderWidth: 1,\\n      },\\n    ],\\n  };\\n\\n  return (\\n    <div className=\\"bg-gray-100 min-h-screen py-10\\">\\n      <div className=\\"container mx-auto px-4\\">\\n        <h1 className=\\"text-3xl font-bold text-center mb-8 text-blue-700\\">TaskEase: Your To-Do Companion 🚀</h1>\\n        <TaskForm addTask={addTask} />\\n        <TaskGraph chartData={chartData} />\\n        <TaskList tasks={tasks} deleteTask={deleteTask} toggleComplete={toggleComplete} />\\n      </div>\\n    </div>\\n  );\\n}\\n\\nexport default App;\\n"\n    },\n    "/components/TaskForm.js": {\n      "code": "import React, { useState } from \'react\';\\nimport { Plus } from \'lucide-react\';\\nimport { format } from \'date-fns\';\\n\\nfunction TaskForm({ addTask }) {\\n  const [text, setText] = useState(\'\');\\n  const [dueDate, setDueDate] = useState(\'\');\\n\\n  const handleSubmit = (e) => {\\n    e.preventDefault();\\n    if (text.trim() !== \'\') {\\n      const newTask = {\\n        id: Date.now(),\\n        text: text,\\n        completed: false,\\n        dueDate: dueDate,\\n        createdAt: format(new Date(), \'yyyy-MM-dd HH:mm:ss\')\\n      };\\n      addTask(newTask);\\n      setText(\'\');\\n      setDueDate(\'\');\\n    }\\n  };\\n\\n  return (\\n    <form onSubmit={handleSubmit} className=\\"mb-6\\">\\n      <div className=\\"flex\\">\\n        <input\\n          type=\\"text\\"\\n          className=\\"shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline mr-2\\"\\n          placeholder=\\"Add a new task...\\"\\n          value={text}\\n          onChange={(e) => setText(e.target.value)}\\n        />\\n        <input\\n          type=\\"date\\"\\n          className=\\"shadow appearance-none border rounded w-1/4 py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline mr-2\\"\\n          value={dueDate}\\n          onChange={(e) => setDueDate(e.target.value)}\\n        />\\n        <button\\n          type=\\"submit\\"\\n          className=\\"bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline\\"\\n        >\\n          <Plus className=\\"inline-block mr-1\\" size={16} /> Add Task\\n        </button>\\n      </div>\\n    </form>\\n  );\\n}\\n\\nexport default TaskForm;\\n"\n    },\n    "/components/TaskList.js": {\n      "code": "import React from \'react\';\\nimport TaskItem from \'./TaskItem\';\\n\\nfunction TaskList({ tasks, deleteTask, toggleComplete }) {\\n  return (\\n    <div>\\n      {tasks.length === 0 ? (\\n        <p className=\\"text-center text-gray-500\\">No tasks yet. Add one!</p>\\n      ) : (\\n        <ul>\\n          {tasks.map((task) => (\\n            <TaskItem\\n              key={task.id}\\n              task={task}\\n              deleteTask={deleteTask}\\n              toggleComplete={toggleComplete}\\n            />\\n          ))}\\n        </ul>\\n      )}\\n    </div>\\n  );\\n}\\n\\nexport default TaskList;\\n"\n    },\n    "/components/TaskItem.js": {\n      "code": "import React from \'react\';\\nimport { Trash, Edit, Check, X } from \'lucide-react\';\\nimport { format } from \'date-fns\';\\n\\nfunction TaskItem({ task, deleteTask, toggleComplete }) {\\n  return (\\n    <li className=\\"flex items-center justify-between py-2 px-4 bg-white rounded shadow mb-2\\">\\n      <div>\\n        <input\\n          type=\\"checkbox\\"\\n          id={`task-${task.id}`}\\n          checked={task.completed}\\n          onChange={() => toggleComplete(task.id)}\\n          className=\\"mr-2 leading-tight\\"\\n        />\\n        <label htmlFor={`task-${task.id}`} className={`text-gray-700 text-base ${task.completed ? \'line-through text-gray-500\' : \'\'}`}>\\n          {task.text}\\n        </label>\\n        {task.dueDate && (\\n          <div className=\\"text-sm text-gray-500\\">\\n            Due: {format(new Date(task.dueDate), \'MMM dd, yyyy\')}\\n          </div>\\n        )}\\n\\n      </div>\\n      <div>\\n        <button onClick={() => deleteTask(task.id)} className=\\"hover:bg-red-100 text-red-500 hover:text-red-700 p-2 rounded-full focus:outline-none focus:shadow-outline\\">\\n          <Trash className=\\"h-4 w-4\\"/>\\n        </button>\\n\\n      </div>\\n    </li>\\n  );\\n}\\n\\nexport default TaskItem;\\n"\n    },\n    "/components/TaskGraph.js": {\n      "code": "import React from \'react\';\\nimport { Pie } from \'react-chartjs-2\';\\nimport { Chart as ChartJS, ArcElement, Tooltip, Legend } from \'chart.js\';\\n\\nChartJS.register(ArcElement, Tooltip, Legend);\\n\\nfunction TaskGraph({ chartData }) {\\n  const options = {\\n    responsive: true,\\n    maintainAspectRatio: false,\\n  };\\n\\n  return (\\n    <div className=\\"w-full md:w-1/2 mx-auto h-64\\">\\n      <Pie data={chartData} options={options} />\\n    </div>\\n  );\\n}\\n\\nexport default TaskGraph;\\n"\n    }\n  },\n  "generatedFiles": [\n    "/App.js",\n    "/components/TaskForm.js",\n    "/components/TaskList.js",\n    "/components/TaskItem.js",\n    "/components/TaskGraph.js"\n  ]\n}\n```',
-        },
-      ],
-    },
-  ],
-});
+function getGenAI() {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("Gemini API key is missing. Set GEMINI_API_KEY or NEXT_PUBLIC_GEMINI_API_KEY in .env.local.");
+  }
+
+  return new GoogleGenerativeAI(apiKey);
+}
+
+function stripCodeFence(content) {
+  const trimmed = content.trim();
+  if (!trimmed.startsWith("```")) {
+    return trimmed;
+  }
+
+  return trimmed
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "")
+    .trim();
+}
+
+function cleanJsonString(raw) {
+  let cleaned = stripCodeFence(raw);
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace >= firstBrace) {
+    cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+  }
+  return cleaned;
+}
+
+// Fallback extractor that recovers file code blocks via regex when JSON is truncated/malformed
+function extractFilesByRegex(rawText) {
+  console.log("[AiModel] Attempting regex fallback extraction for files...");
+  const files = {};
+  const fileRegex = /"(\/[^"]+\.(?:js|jsx|css|html|json))"\s*:\s*\{[\s\S]*?"code"\s*:\s*"((?:\\.|[^"\\])*)"/g;
+  let match;
+  while ((match = fileRegex.exec(rawText)) !== null) {
+    const filename = match[1];
+    let codeStr = match[2];
+    try {
+      // Decode escaped JSON string
+      codeStr = JSON.parse(`"${codeStr}"`);
+    } catch {
+      codeStr = codeStr.replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+    }
+    files[filename] = { code: codeStr };
+  }
+
+  // Extract title if possible
+  const titleMatch = rawText.match(/"projectTitle"\s*:\s*"([^"]+)"/);
+  const projectTitle = titleMatch ? titleMatch[1] : "Generated Project";
+
+  // Extract explanation if possible
+  const explMatch = rawText.match(/"explanation"\s*:\s*"([^"]+)"/);
+  const explanation = explMatch ? explMatch[1] : "Interactive React Project";
+
+  if (Object.keys(files).length > 0) {
+    console.log(`[AiModel] Regex fallback successfully recovered ${Object.keys(files).length} files!`);
+    return {
+      projectTitle,
+      explanation,
+      files,
+      generatedFiles: Object.keys(files),
+    };
+  }
+  return null;
+}
+
+function parseJsonSafely(rawText) {
+  const cleaned = cleanJsonString(rawText);
+  try {
+    return JSON.parse(cleaned);
+  } catch (initialErr) {
+    try {
+      const repaired = jsonrepair(cleaned);
+      return JSON.parse(repaired);
+    } catch (repairErr) {
+      try {
+        const repairedRaw = jsonrepair(rawText);
+        return JSON.parse(repairedRaw);
+      } catch (rawRepairErr) {
+        // Fallback: Attempt regex-based recovery
+        const recovered = extractFilesByRegex(rawText);
+        if (recovered && Object.keys(recovered.files).length > 0) {
+          return recovered;
+        }
+        console.error("[AiModel] JSON repair & regex extraction completely failed:", repairErr?.message);
+        throw initialErr;
+      }
+    }
+  }
+}
+
+const RETRYABLE_CODES = [429, 503, 502, 504];
+const MAX_RETRIES = 3;
+
+function isRetryableError(err) {
+  const status = err?.status || err?.response?.status;
+  return RETRYABLE_CODES.includes(status) || /503|429|rate.?limit|quota|overload/i.test(err?.message || "");
+}
+
+async function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function callWithFallback(generationConfig, prompt) {
+  const genAI = getGenAI();
+  let lastError;
+
+  for (const modelName of CANDIDATE_MODELS) {
+    let attempt = 0;
+    while (attempt <= MAX_RETRIES) {
+      try {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const result = await model.generateContent({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig,
+        });
+        return result;
+      } catch (err) {
+        lastError = err;
+        attempt++;
+        if (isRetryableError(err) && attempt <= MAX_RETRIES) {
+          const delay = Math.min(2000 * Math.pow(2, attempt - 1), 30000);
+          console.warn(`[Gemini API] Model ${modelName} returned retryable error. Retrying in ${delay}ms (attempt ${attempt}/${MAX_RETRIES})...`);
+          await sleep(delay);
+        } else {
+          console.warn(`[Gemini API] Failed with model ${modelName}:`, err?.message || err);
+          break; // move to next model
+        }
+      }
+    }
+  }
+
+  throw lastError || new Error("Failed to generate content with Gemini API.");
+}
+
+export async function generateChatText(prompt) {
+  const result = await callWithFallback(CHAT_GENERATION_CONFIG, prompt);
+
+  const text = result?.response?.text?.();
+  if (typeof text !== "string" || !text.trim()) {
+    throw new Error("AI chat response is empty.");
+  }
+
+  return text.trim();
+}
+
+function normalizeCodeResult(parsed) {
+  if (!parsed || typeof parsed !== "object") {
+    console.error("[AiModel] normalizeCodeResult: parsed is not an object:", typeof parsed);
+    return {
+      projectTitle: "Generated Project",
+      explanation: "",
+      files: {},
+      generatedFiles: [],
+    };
+  }
+
+  let projectTitle =
+    parsed.projectTitle ||
+    parsed.title ||
+    parsed.projectName ||
+    parsed.name ||
+    "Generated Project";
+  let explanation =
+    parsed.explanation ||
+    parsed.description ||
+    parsed.summary ||
+    "";
+
+  let rawFiles =
+    parsed.files ||
+    parsed.code ||
+    parsed.data?.files ||
+    parsed.project?.files;
+
+  // If the AI returned files as an array of {path, code} objects, convert it
+  if (Array.isArray(rawFiles)) {
+    const converted = {};
+    for (const item of rawFiles) {
+      if (item && typeof item === "object" && typeof item.path === "string") {
+        const key = item.path.startsWith("/") ? item.path : `/${item.path}`;
+        const code = typeof item.code === "string" ? item.code : typeof item.content === "string" ? item.content : "";
+        converted[key] = { code };
+      }
+    }
+    rawFiles = converted;
+  }
+
+  // Fallback: if rawFiles is still null/undefined, try to use parsed itself as files map
+  if (!rawFiles || typeof rawFiles !== "object") {
+    rawFiles = parsed;
+  }
+
+  const normalizedFiles = {};
+
+  if (rawFiles && typeof rawFiles === "object" && !Array.isArray(rawFiles)) {
+    for (const [key, value] of Object.entries(rawFiles)) {
+      if (
+        key === "projectTitle" ||
+        key === "explanation" ||
+        key === "generatedFiles" ||
+        key === "title" ||
+        key === "description" ||
+        key === "name" ||
+        key === "summary" ||
+        key === "files" ||
+        key === "data" ||
+        key === "project"
+      ) {
+        continue;
+      }
+
+      const normalizedKey = key.startsWith("/") ? key : `/${key}`;
+
+      if (typeof value === "string") {
+        normalizedFiles[normalizedKey] = { code: value };
+      } else if (value && typeof value === "object" && typeof value.code === "string") {
+        normalizedFiles[normalizedKey] = { code: value.code };
+      }
+    }
+  }
+
+  // Ensure /App.js is the canonical root component for Sandpack React template
+  if (normalizedFiles["/App.jsx"]) {
+    normalizedFiles["/App.js"] = normalizedFiles["/App.jsx"];
+    delete normalizedFiles["/App.jsx"];
+  } else if (normalizedFiles["/src/App.jsx"] || normalizedFiles["/src/App.js"]) {
+    const srcApp = normalizedFiles["/src/App.jsx"] || normalizedFiles["/src/App.js"];
+    if (!normalizedFiles["/App.js"]) {
+      normalizedFiles["/App.js"] = srcApp;
+    }
+    delete normalizedFiles["/src/App.jsx"];
+    delete normalizedFiles["/src/App.js"];
+  }
+
+  // Ensure tailwind / styles file exists
+  if (!normalizedFiles["/styles.css"] && normalizedFiles["/App.css"]) {
+    normalizedFiles["/styles.css"] = normalizedFiles["/App.css"];
+  }
+
+  const generatedFiles = Object.keys(normalizedFiles);
+  console.log(`[AiModel] normalizeCodeResult: ${generatedFiles.length} files normalized. Title: "${projectTitle}"`);
+
+  return {
+    projectTitle: String(projectTitle),
+    explanation: String(explanation),
+    files: normalizedFiles,
+    generatedFiles,
+  };
+}
+
+export async function generateCodeJson(prompt) {
+  const result = await callWithFallback(CODE_GENERATION_CONFIG, prompt);
+
+  const rawText = result?.response?.text?.();
+  if (typeof rawText !== "string" || !rawText.trim()) {
+    throw new Error("AI code response is empty.");
+  }
+
+  console.log("[AiModel] Raw Gemini response (first 500 chars):", rawText.slice(0, 500));
+
+  const parsed = parseJsonSafely(rawText);
+  console.log("[AiModel] Parsed top-level keys:", parsed && typeof parsed === "object" ? Object.keys(parsed) : typeof parsed);
+  return normalizeCodeResult(parsed);
+}

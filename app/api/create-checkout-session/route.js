@@ -9,8 +9,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 
 export async function POST(req) {
   try {
-    const { pricingOption, userId } = await req.json();
-    console.log("Received checkout session request:", { pricingOption, userId });
+    const { pricingOption, userId, returnUrl } = await req.json();
+    console.log("Received checkout session request:", { pricingOption, userId, returnUrl });
 
     // Look up the pricing product from your Lookup file
     const product = Lookup.PRICING_OPTIONS.find((p) => p.name === pricingOption);
@@ -39,6 +39,9 @@ export async function POST(req) {
       );
     }
 
+    const origin = req.headers.get("origin") || "http://localhost:3000";
+    const encodedReturn = returnUrl ? encodeURIComponent(returnUrl) : encodeURIComponent("/pricing");
+
     // Create a Stripe Checkout session and pass tokens in metadata.
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
@@ -53,9 +56,10 @@ export async function POST(req) {
         userId,
         tokens: product.value.toString(), // product.value comes from Lookup
         pricingOption,
+        returnUrl: returnUrl || "/pricing",
       },
-      success_url: `${req.headers.get("origin")}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.headers.get("origin")}/cancel`,
+      success_url: `${origin}/success?session_id={CHECKOUT_SESSION_ID}&returnUrl=${encodedReturn}`,
+      cancel_url: `${origin}/pricing`,
     });
 
     console.log("Checkout session created:", session.id);

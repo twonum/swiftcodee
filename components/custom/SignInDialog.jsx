@@ -103,7 +103,7 @@ function SignInDialog({ openDialog, closeDialog }) {
         // Store the full user object in localStorage.
         localStorage.setItem("user", JSON.stringify(user));
         // Set a cookie storing only the user's email, with encoding to ensure safe characters.
-        document.cookie = `auth-token=${encodeURIComponent(user.email)}; path=/`;
+        document.cookie = `auth-token=${encodeURIComponent(user.email)}; path=/; max-age=31536000; SameSite=Lax`;
       }
       setUserDetail(userInfo?.data);
       closeDialog(false);

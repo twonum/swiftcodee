@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, Suspense } from "react";
+import React, { useState, useMemo } from "react";
 import { ThemeProvider } from "next-themes";
 import dynamic from "next/dynamic";
 import { MessagesContext } from "@/context/MessagesContext";
@@ -10,6 +10,7 @@ import { useConvex, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { ActionContext } from "@/context/ActionContext";
+import { usePathname } from "next/navigation";
 
 // Lazy load heavy components for faster initial load
 const Header = dynamic(() => import("@/components/custom/Header"), {
@@ -21,8 +22,11 @@ const AppSideBar = dynamic(() => import("@/components/custom/AppSideBar"), {
 
 function Provider({ children }) {
   const [messages, setMessages] = useState([]);
-  const [action, setAction] = useState();
-  const convex = useConvex();
+  const [action, setAction] = useState(null);
+  const pathname = usePathname();
+
+  // On workspace pages we don't render the global header/sidebar/footer
+  const isWorkspace = pathname?.startsWith("/workspace/");
 
   // Retrieve user info from localStorage once.
   const storedUser = useMemo(() => {
@@ -33,13 +37,33 @@ function Provider({ children }) {
     return null;
   }, []);
 
-  // Use real-time query for authentication details.
-  // When storedUser is available, pass the email as argument;
-  // otherwise, the query is not run (returns undefined).
+  // Synchronize auth cookie
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const email = storedUser?.email;
+      if (email) {
+        document.cookie = `auth-token=${encodeURIComponent(email)}; path=/; max-age=31536000; SameSite=Lax`;
+      }
+    }
+  }, [storedUser]);
+
   const userDetail = useQuery(
     api.users.GetUser,
     storedUser ? { email: storedUser.email } : undefined
   );
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined" && userDetail?.email) {
+      document.cookie = `auth-token=${encodeURIComponent(userDetail.email)}; path=/; max-age=31536000; SameSite=Lax`;
+    }
+  }, [userDetail]);
+
+  // Reset action when navigating away from workspace
+  React.useEffect(() => {
+    if (!isWorkspace) {
+      setAction(null);
+    }
+  }, [isWorkspace]);
 
   return (
     <GoogleOAuthProvider
@@ -56,15 +80,19 @@ function Provider({ children }) {
               enableSystem
               disableTransitionOnChange
             >
-              <Suspense fallback={<div>Loading header...</div>}>
-                <Header />
-              </Suspense>
-              <SidebarProvider defaultOpen={false}>
-                <Suspense fallback={<div>Loading sidebar...</div>}>
-                  <AppSideBar />
-                </Suspense>
-                {children}
-              </SidebarProvider>
+              {isWorkspace ? (
+                // Workspace: render ONLY children (full-screen, no global chrome)
+                <>{children}</>
+              ) : (
+                // All other pages: render with Header + global sidebar
+                <>
+                  <Header />
+                  <SidebarProvider defaultOpen={false}>
+                    <AppSideBar />
+                    {children}
+                  </SidebarProvider>
+                </>
+              )}
             </ThemeProvider>
           </ActionContext.Provider>
         </MessagesContext.Provider>

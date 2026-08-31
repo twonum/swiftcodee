@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useContext, useEffect, useState, useCallback } from "react";
+import React, { useContext, useEffect, useState, useCallback, useRef } from "react";
 import {
   SandpackProvider,
   SandpackLayout,
@@ -15,107 +15,135 @@ import Prompt from "@/data/Prompt";
 import { useConvex, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useParams } from "next/navigation";
-import { Code, Download, Loader, LockIcon, Send, View } from "lucide-react";
+import { Code, Download, Loader, LockIcon, RefreshCw, Send, LayoutTemplate } from "lucide-react";
 import { countToken } from "./ChatView";
 import { UserDetailsContext } from "@/context/UserDetailsContext";
 import { Button } from "../ui/button";
 import SignInDialog from "./SignInDialog";
 import SandpankPreviewClient from "./SandpankPreviewClient";
 import { ActionContext } from "@/context/ActionContext";
+import { toast } from "sonner";
 
-// ErrorBoundary to catch any render errors
+// ── ErrorBoundary ──────────────────────────────────────────────
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
     this.state = { hasError: false };
   }
-  static getDerivedStateFromError(error) {
-    return { hasError: true };
-  }
-  componentDidCatch(error, errorInfo) {
-    console.error("ErrorBoundary caught an error:", error, errorInfo);
-  }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error, info) { console.error("CodeView error:", error, info); }
   render() {
-    if (this.state.hasError) {
-      return <div>Something went wrong.</div>;
-    }
+    if (this.state.hasError)
+      return (
+        <div className="flex items-center justify-center h-full text-red-400 p-4 text-sm">
+          Editor failed to load. Please refresh.
+        </div>
+      );
     return this.props.children;
   }
 }
 
+// ── File normalisation ─────────────────────────────────────────
+function normalizeFiles(rawFiles) {
+  const merged = { ...Lookup.DEFAULT_FILE, ...rawFiles };
+
+  if (merged["/App.jsx"]) {
+    merged["/App.js"] = merged["/App.jsx"];
+    delete merged["/App.jsx"];
+  } else if (merged["/src/App.jsx"] || merged["/src/App.js"]) {
+    const srcApp = merged["/src/App.jsx"] || merged["/src/App.js"];
+    if (!merged["/App.js"]) merged["/App.js"] = srcApp;
+    delete merged["/src/App.jsx"];
+    delete merged["/src/App.js"];
+  }
+
+  // Force ALL files to be editable — Sandpack template sometimes marks files readOnly
+  const result = {};
+  for (const [path, file] of Object.entries(merged)) {
+    if (typeof file === "string") {
+      result[path] = { code: file, readOnly: false };
+    } else if (file && typeof file === "object") {
+      result[path] = { ...file, readOnly: false };
+    } else {
+      result[path] = file;
+    }
+  }
+  return result;
+}
+
+// ── Main component ─────────────────────────────────────────────
 function CodeView() {
   const { id } = useParams();
   const [activeTab, setActiveTab] = useState("code");
-  const [files, setFiles] = useState(Lookup?.DEFAULT_FILE || {});
+  const [files, setFiles] = useState(normalizeFiles({}));
   const [loading, setLoading] = useState(false);
+  // Track whether we've loaded files from the server (not just defaults)
+  const [filesReady, setFilesReady] = useState(false);
+  const containerRef = useRef(null);
+  const [editorHeight, setEditorHeight] = useState(500);
 
   const { action, setAction } = useContext(ActionContext);
-
-  const onActionButtonClick = (action) => {
-    setAction({
-      actionType: action,
-      timeStamp: Date.now(),
-    });
-  };
-
   const { messages } = useContext(MessagesContext);
   const { userDetail, setUserDetail } = useContext(UserDetailsContext);
-  const [openDialog, setOpenDialog] = useState(false); // Add state for dialog
+  const [openDialog, setOpenDialog] = useState(false);
 
   const convex = useConvex();
   const updateFilesMutation = useMutation(api.workspace.UpdateFiles);
   const updateTokensMutation = useMutation(api.users.UpdateToken);
 
-  // Fetch workspace files when workspace ID is available
+  // ── Measure container height for Sandpack ──────────────────
+  useEffect(() => {
+    const updateHeight = () => {
+      if (containerRef.current) {
+        const h = containerRef.current.getBoundingClientRect().height;
+        if (h > 100) setEditorHeight(h);
+      }
+    };
+    updateHeight();
+    const ro = new ResizeObserver(updateHeight);
+    if (containerRef.current) ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  const onActionButtonClick = (actionType) => {
+    setAction({ actionType, timeStamp: Date.now() });
+    setActiveTab("preview");
+  };
+
+  // ── Load workspace files ────────────────────────────────────
   const fetchWorkspaceFiles = useCallback(async () => {
     if (!id) return;
+    setFilesReady(false); // reset so Sandpack remounts cleanly
     setLoading(true);
     try {
-      const result = await convex.query(api.workspace.GetWorkspace, {
-        workspaceId: id,
-      });
-      // Ensure mergedFiles is an object even if result or fileData is missing
-      const mergedFiles = {
-        ...Lookup.DEFAULT_FILE,
-        ...(result?.fileData || {}),
-      };
-      setFiles(mergedFiles);
+      const result = await convex.query(api.workspace.GetWorkspace, { workspaceId: id });
+      const normalized = normalizeFiles(result?.fileData || {});
+      setFiles(normalized);
     } catch (error) {
       console.error("Error fetching workspace files:", error);
     } finally {
       setLoading(false);
+      setFilesReady(true); // files are ready — mount/remount Sandpack now
     }
   }, [convex, id]);
 
   useEffect(() => {
-    try {
-      fetchWorkspaceFiles().catch((error) =>
-        console.error("Error in fetchWorkspaceFiles effect:", error)
-      );
-    } catch (error) {
-      console.error(
-        "Unexpected error in useEffect for fetchWorkspaceFiles:",
-        error
-      );
-    }
+    fetchWorkspaceFiles().catch(console.error);
   }, [fetchWorkspaceFiles]);
+
+  // Switch to preview on action trigger
   useEffect(() => {
-    setActiveTab("preview");
+    if (action?.actionType) setActiveTab("preview");
   }, [action]);
-  // Generate AI code when a new user message is added
+
+  // Generate AI code when last message is from user
   useEffect(() => {
-    try {
-      if (
-        Array.isArray(messages) &&
-        messages.length > 0 &&
-        messages[messages.length - 1]?.role === "user"
-      ) {
-        generateAiCode().catch((error) =>
-          console.error("Error in generateAiCode effect:", error)
-        );
-      }
-    } catch (error) {
-      console.error("Error in messages useEffect:", error);
+    if (
+      Array.isArray(messages) &&
+      messages.length > 0 &&
+      messages[messages.length - 1]?.role === "user"
+    ) {
+      generateAiCode().catch(console.error);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages]);
@@ -125,42 +153,32 @@ function CodeView() {
     setLoading(true);
     try {
       const promptData = JSON.stringify(messages) + Prompt.CODE_GEN_PROMPT;
-      const response = await axios.post("/api/gen-ai-code", {
-        prompt: promptData,
-      });
+      const response = await axios.post("/api/gen-ai-code", { prompt: promptData });
       const aiResponse = response.data || {};
-
-      // Merge default files with AI generated files safely
-      const mergedFiles = {
-        ...Lookup.DEFAULT_FILE,
-        ...(aiResponse?.files || {}),
-      };
+      const mergedFiles = normalizeFiles(aiResponse?.files || {});
       setFiles(mergedFiles);
 
-      // Update files in the workspace backend if files are present
       if (aiResponse?.files) {
-        await updateFilesMutation({
-          workspaceId: id,
-          files: aiResponse.files,
-        });
+        await updateFilesMutation({ workspaceId: id, files: mergedFiles });
       }
 
-      // Calculate token usage and update user's token balance if userDetail exists
       const tokenUsage = countToken(JSON.stringify(aiResponse));
       const currentToken = Number(userDetail?.token) || 0;
-      const updatedToken = currentToken - Number(tokenUsage);
+      const updatedToken = currentToken - tokenUsage;
       if (userDetail?._id) {
         setUserDetail((prev) => ({ ...prev, token: updatedToken }));
-        await updateTokensMutation({
-          userId: userDetail._id,
-          token: updatedToken,
-        });
+        await updateTokensMutation({ userId: userDetail._id, token: updatedToken });
       }
 
-      // Switch to code tab after generating code
-      setActiveTab("code");
+      setActiveTab("preview");
     } catch (error) {
-      console.error("Error generating AI code:", error);
+      console.error("Error generating AI code:", error?.response?.data || error);
+      const isRateOrOverload = /503|429|overload|rate.?limit|quota/i.test(error?.response?.data?.error || error?.message || "");
+      if (isRateOrOverload) {
+        toast.error("AI service is experiencing high load. Please try sending a quick follow-up prompt to re-trigger code generation.");
+      } else {
+        toast.error("Code generation encountered an issue. Try sending another prompt.");
+      }
     } finally {
       setLoading(false);
     }
@@ -168,134 +186,171 @@ function CodeView() {
 
   return (
     <ErrorBoundary>
-      <div className="relative">
-        {/* Header with tab selectors */}
-        <div className="bg-[#ADFA1D] w-full p-2 border">
+      <div className="flex flex-col h-full w-full min-h-0" style={{ overflow: "hidden" }}>
+
+        {/* ── Toolbar ──────────────────────────────────────── */}
+        <div className="flex-shrink-0 bg-[#ADFA1D] w-full px-3 py-1.5 border-b border-black">
           <div className="flex items-center justify-between">
-            {/* Left Group: Code and Preview */}
-            <div className="flex items-center bg-black">
-              <Button
-                variant="secondary"
+            {/* Tabs */}
+            <div className="flex items-center gap-1 bg-black/90 p-1 rounded-lg">
+              <button
                 onClick={() => setActiveTab("code")}
-                className={`font-thin ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                   activeTab === "code"
-                    ? "text-[#ADFA1D] bg-[#ADFA1D] bg-opacity-25"
-                    : "text-white"
+                    ? "bg-[#ADFA1D] text-black shadow-md"
+                    : "text-white/80 hover:text-white hover:bg-white/10"
                 }`}
               >
+                <Code className="h-3.5 w-3.5" />
                 Code
-                <Code className="h-5 w-5 ml-1" />
-              </Button>
-              <Button
+              </button>
+              <button
                 onClick={() => setActiveTab("preview")}
-                variant="secondary"
-                className={`font-thin ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                   activeTab === "preview"
-                    ? "text-[#ADFA1D] bg-[#ADFA1D] bg-opacity-25"
-                    : "text-white"
+                    ? "bg-[#ADFA1D] text-black shadow-md"
+                    : "text-white/80 hover:text-white hover:bg-white/10"
                 }`}
               >
+                <LayoutTemplate className="h-3.5 w-3.5" />
                 Preview
-                <View className="h-5 w-5 ml-1" />
-              </Button>
+              </button>
             </div>
-            {/* Right Group: Download and Deploy */}
-            <div className="flex items-center bg-black ">
-              <Button
+
+            {/* Actions */}
+            <div className="flex items-center gap-1 bg-black/90 p-1 rounded-lg">
+              <button
                 onClick={() => onActionButtonClick("export")}
-                className="font-thin"
-                variant="secondary"
+                disabled={loading || !filesReady}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold text-white hover:text-[#ADFA1D] hover:bg-white/10 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
+                <Download className="h-3.5 w-3.5" />
                 Export
-                <Download className="h-5 w-5 ml-1" />
-              </Button>
-              <Button
+              </button>
+              <button
                 onClick={() => onActionButtonClick("deploy")}
-                className="font-thin"
-                variant="secondary"
+                disabled={loading || !filesReady}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs sm:text-sm font-bold text-white hover:text-[#ADFA1D] hover:bg-white/10 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               >
+                <Send className="h-3.5 w-3.5" />
                 Deploy
-                <Send className="h-5 w-5 ml-1" />
-              </Button>
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Sandpack live coding environment */}
-        <SandpackProvider
-          template="react"
-          theme="dark"
-          files={files}
-          customSetup={{
-            dependencies: { ...Lookup.DEPENDANCY },
-          }}
-          options={{
-            externalResources: ["https://unpkg.com/@tailwindcss/browser@4"],
-          }}
+        {/* ── Sandpack area ─────────────────────────────────── */}
+        <div
+          ref={containerRef}
+          className="flex-1 relative"
+          style={{ minHeight: 0, overflow: "hidden" }}
         >
-          {/* Outer container fixes the overall width/height */}
-          <div style={{ height: "80vh", width: "100%" }}>
-            <SandpackLayout style={{ height: "100%", width: "100%" }}>
-              {activeTab === "code" ? (
-                // Code view: divide the space between the file explorer and code editor
-                <div style={{ display: "flex", height: "100%", width: "100%" }}>
-                  <SandpackFileExplorer
-                    style={{ width: "25%", height: "100%" }}
-                  />
+          {/* Sandpack Provider: key includes files version count so any newly generated files force immediate fresh compilation */}
+          {filesReady ? (
+            <SandpackProvider
+              key={`${id}-${Object.keys(files).length}-${files["/App.js"]?.code?.length || 0}`}
+              template="react"
+              theme="dark"
+              files={files}
+              customSetup={{
+                dependencies: { ...Lookup.DEPENDANCY },
+              }}
+              options={{
+                externalResources: ["https://unpkg.com/@tailwindcss/browser@4"],
+                recompileMode: "delayed",
+                recompileDelay: 200,
+                autoReload: true,
+              }}
+            >
+              {/* Code tab */}
+              <div
+                style={{
+                  display: activeTab === "code" ? "flex" : "none",
+                  height: "100%",
+                  width: "100%",
+                  position: "absolute",
+                  inset: 0,
+                  overflow: "hidden",
+                }}
+              >
+                {/* File explorer — 220px wide */}
+                <div style={{ width: 220, minWidth: 180, flexShrink: 0, height: "100%", overflowY: "auto", overflowX: "hidden", borderRight: "1px solid rgba(255,255,255,0.08)" }}>
+                  <SandpackFileExplorer style={{ height: "100%", width: "100%" }} />
+                </div>
+
+                {/* Code editor with full scrollability and visible Run button */}
+                <div style={{ flex: 1, minWidth: 0, height: "100%", position: "relative", overflow: "hidden" }}>
                   <SandpackCodeEditor
-                    style={{ width: "75%", height: "100%" }}
+                    style={{ height: "100%", width: "100%" }}
+                    showTabs
+                    showLineNumbers
+                    showInlineErrors
+                    closableTabs
+                    readOnly={false}
+                    showRunButton={true}
                   />
                 </div>
-              ) : (
-                // Preview view: fills the container exactly
-                <>
-                  <SandpankPreviewClient />
-                </>
-              )}
-            </SandpackLayout>
-          </div>
-        </SandpackProvider>
+              </div>
 
-        {/* Loading overlay */}
-        {loading && (
-          <div
-            className="p-10 bg-lime-800 opacity-80 absolute top-0 w-full h-full flex items-center justify-center"
-            role="status"
-            aria-live="polite"
-          >
-            <Loader
-              className="animate-spin h-10 w-10 text-black"
-              aria-hidden="true"
-            />
-            <h2 className="text-black pl-2">Cooking files...</h2>
-          </div>
-        )}
-        {/* Login overlay */}
-        {!userDetail && !loading && (
-          <div
-            className="absolute top-0 left-0 w-full h-full flex flex-col items-center justify-center bg-lime-800 bg-opacity-80 p-10 space-y-4"
-            role="status"
-            aria-live="polite"
-          >
-            <LockIcon className="h-12 w-12 text-black" aria-hidden="true" />
-            <h2 className="text-black text-xl font-bold">
-              Please login first.
-            </h2>
-            <Button
-              onClick={() => setOpenDialog(true)} // Open dialog on click
-              variant="secondary"
-              className="px-6 py-3 border border-[#ADFA1D] text-[#ADFA1D] font-semibold rounded-none transition-colors duration-300 hover:bg-[#ADFA1D] hover:text-black"
-            >
-              Login
-            </Button>
-          </div>
-        )}
+              {/* Preview tab — always mounted in DOM with inset 0 so it compiles without lag */}
+              <div
+                style={{
+                  display: activeTab === "preview" ? "flex" : "none",
+                  height: "100%",
+                  width: "100%",
+                  position: "absolute",
+                  inset: 0,
+                  overflow: "hidden",
+                }}
+              >
+                <SandpankPreviewClient />
+              </div>
+            </SandpackProvider>
+          ) : (
+            /* Files not yet loaded — show a skeleton */
+            <div className="flex items-center justify-center h-full gap-3 text-gray-600">
+              <Loader className="animate-spin h-6 w-6 text-[#ADFA1D]/50" />
+              <span className="text-sm">Loading project...</span>
+            </div>
+          )}
+
+          {/* Loading overlay (AI generation) */}
+          {loading && (
+            <div className="absolute inset-0 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center z-30 gap-4">
+              <div className="relative flex items-center justify-center">
+                <div className="w-20 h-20 rounded-full border-2 border-[#ADFA1D]/20 animate-ping absolute" />
+                <div className="w-16 h-16 rounded-2xl bg-[#0a0a0a] border border-[#ADFA1D] flex items-center justify-center shadow-[0_0_30px_rgba(173,250,29,0.3)]">
+                  <Loader className="animate-spin h-8 w-8 text-[#ADFA1D]" />
+                </div>
+              </div>
+              <div className="text-center space-y-1">
+                <p className="text-[#ADFA1D] text-lg font-bold tracking-wide animate-pulse">
+                  Cooking Files & Compiling...
+                </p>
+                <p className="text-gray-400 text-xs font-mono">
+                  Writing components · Setting up state · Bundling React app
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Login overlay */}
+          {!userDetail && !loading && (
+            <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center z-20 gap-4">
+              <LockIcon className="h-12 w-12 text-[#ADFA1D]" />
+              <h2 className="text-white text-xl font-bold">Please login first.</h2>
+              <Button
+                onClick={() => setOpenDialog(true)}
+                className="px-6 py-2 bg-[#ADFA1D] text-black font-semibold rounded-lg hover:bg-[#c8ff42] transition-colors"
+              >
+                Login
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
-      {/* Render the SignInDialog */}
-      <SignInDialog
-        openDialog={openDialog}
-        closeDialog={(v) => setOpenDialog(v)}
-      />
+
+      <SignInDialog openDialog={openDialog} closeDialog={(v) => setOpenDialog(v)} />
     </ErrorBoundary>
   );
 }

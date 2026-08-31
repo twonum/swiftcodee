@@ -10,6 +10,9 @@ export default function SuccessPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session_id");
+  const returnUrlParam = searchParams.get("returnUrl");
+  const returnUrl = returnUrlParam ? decodeURIComponent(returnUrlParam) : "/pricing";
+
   const { userDetail, setUserData } = useContext(UserDetailsContext);
   const UpdateToken = useMutation(api.users.UpdateToken);
 
@@ -26,7 +29,7 @@ export default function SuccessPage() {
           const sessionData = await response.json();
           if (sessionData.metadata && sessionData.metadata.tokens) {
             const tokensToAdd = Number(sessionData.metadata.tokens);
-            const updatedTokens = userDetail?.token + tokensToAdd;
+            const updatedTokens = (Number(userDetail?.token) || 0) + tokensToAdd;
             console.log("Updated tokens:", updatedTokens);
             await UpdateToken({
               token: updatedTokens,
@@ -37,14 +40,14 @@ export default function SuccessPage() {
           console.error("Error updating tokens on success:", error);
         }
       }
-      // Redirect after a delay
+      // Redirect back to original page (or pricing) after a delay
       setTimeout(() => {
-        router.push("/");
-      }, 7000);
+        router.push(returnUrl);
+      }, 5000);
     };
 
     updateTokensAndRedirect();
-  }, [router, userDetail, sessionId, UpdateToken, setUserData]);
+  }, [router, userDetail, sessionId, UpdateToken, setUserData, returnUrl]);
 
   // Determine the token message based on the updated token value.
   let tokenMessage = "";
@@ -76,8 +79,22 @@ export default function SuccessPage() {
         >
           <h1 className="title">Tokens Updated!</h1>
           <p className="subtitle">{tokenMessage}</p>
+          <div className="flex items-center justify-center gap-3 mt-4">
+            <button
+              onClick={() => router.push(returnUrl)}
+              className="px-6 py-2.5 bg-[#ADFA1D] text-black font-bold rounded hover:bg-[#c8ff42] transition-colors cursor-pointer text-sm"
+            >
+              Continue to {returnUrl === "/pricing" ? "Pricing" : "Workspace"}
+            </button>
+            <button
+              onClick={() => router.push("/")}
+              className="px-6 py-2.5 border border-[#ADFA1D] text-[#ADFA1D] font-bold rounded hover:bg-[#ADFA1D]/10 transition-colors cursor-pointer text-sm"
+            >
+              Home
+            </button>
+          </div>
         </motion.div>
-        <p className="redirect-msg">Redirecting to home page in 5 seconds...</p>
+        <p className="redirect-msg">Redirecting back in 5 seconds...</p>
         <div className="animation-container">
           <div className="confetti confetti-1"></div>
           <div className="confetti confetti-2"></div>
