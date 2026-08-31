@@ -21,13 +21,32 @@ const CANDIDATE_MODELS = Array.from(
   new Set(
     [
       process.env.GEMINI_MODEL,
+      "gemini-3.6-flash",
       "gemini-2.5-flash",
       "gemini-2.0-flash",
       "gemini-1.5-flash",
-      "gemini-3.6-flash",
+      "gemini-1.5-pro",
+      "gemini-2.5-pro",
     ].filter(Boolean)
   )
 );
+
+// In-memory tracker to skip models that recently returned a quota limit (429) for 60 seconds
+const modelCooldownMap = new Map();
+
+function isModelInCooldown(modelName) {
+  const expiry = modelCooldownMap.get(modelName);
+  if (!expiry) return false;
+  if (Date.now() > expiry) {
+    modelCooldownMap.delete(modelName);
+    return false;
+  }
+  return true;
+}
+
+function setModelCooldown(modelName, durationMs = 60000) {
+  modelCooldownMap.set(modelName, Date.now() + durationMs);
+}
 
 function getGenAI() {
   const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
@@ -124,12 +143,11 @@ function parseJsonSafely(rawText) {
   }
 }
 
-const RETRYABLE_CODES = [429, 503, 502, 504];
-const MAX_RETRIES = 3;
+const RETRYABLE_CODES = [503, 502, 504];
 
-function isRetryableError(err) {
+function isTransientServerError(err) {
   const status = err?.status || err?.response?.status;
-  return RETRYABLE_CODES.includes(status) || /503|429|rate.?limit|quota|overload/i.test(err?.message || "");
+  return RETRYABLE_CODES.includes(status) || /503|502|504|overloaded|service unavailable/i.test(err?.message || "");
 }
 
 async function sleep(ms) {
@@ -141,9 +159,16 @@ async function callWithFallback(generationConfig, prompt) {
   let lastError;
 
   for (const modelName of CANDIDATE_MODELS) {
+    // Skip model if it is currently in cooldown from a 429 quota exhaustion
+    if (isModelInCooldown(modelName)) {
+      console.log(`[AiModel] Skipping ${modelName} (temporarily in cooldown due to quota limit).`);
+      continue;
+    }
+
     let attempt = 0;
-    while (attempt <= MAX_RETRIES) {
+    while (attempt <= 1) {
       try {
+        console.log(`[AiModel] Requesting ${modelName}...`);
         const model = genAI.getGenerativeModel({ model: modelName });
         const result = await model.generateContent({
           contents: [{ role: "user", parts: [{ text: prompt }] }],
@@ -153,19 +178,29 @@ async function callWithFallback(generationConfig, prompt) {
       } catch (err) {
         lastError = err;
         attempt++;
-        if (isRetryableError(err) && attempt <= MAX_RETRIES) {
-          const delay = Math.min(2000 * Math.pow(2, attempt - 1), 30000);
-          console.warn(`[Gemini API] Model ${modelName} returned retryable error. Retrying in ${delay}ms (attempt ${attempt}/${MAX_RETRIES})...`);
+
+        // If 429 quota limit occurs, put this model in cooldown and immediately switch to the next model!
+        const isQuotaError = /429|quota|rate.?limit/i.test(err?.message || "");
+        if (isQuotaError) {
+          console.warn(`[Gemini API] Quota reached for ${modelName}. Putting in 60s cooldown and seamlessly switching to next model...`);
+          setModelCooldown(modelName, 60000);
+          break; // Immediately move to next candidate model
+        }
+
+        // If transient 503 error, retry once briefly before switching
+        if (isTransientServerError(err) && attempt <= 1) {
+          const delay = 1000;
+          console.warn(`[Gemini API] ${modelName} temporary overload. Retrying in ${delay}ms...`);
           await sleep(delay);
         } else {
-          console.warn(`[Gemini API] Failed with model ${modelName}:`, err?.message || err);
-          break; // move to next model
+          console.warn(`[Gemini API] ${modelName} unavailable (${err?.message || err}). Trying next model...`);
+          break; // Move to next candidate model
         }
       }
     }
   }
 
-  throw lastError || new Error("Failed to generate content with Gemini API.");
+  throw lastError || new Error("All AI models are currently unavailable. Please try again in a few moments.");
 }
 
 export async function generateChatText(prompt) {
