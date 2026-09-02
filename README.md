@@ -1,139 +1,99 @@
 # SwiftCodee
 
-SwiftCodee is an innovative, real-time chat and workspace app designed to help you build, collaborate, and code—all while enjoying stunning, extreme animations and a smooth user experience. With integrated Google authentication, dynamic workspaces, and real-time updates powered by Convex, SwiftCodee makes coding and collaboration fun, engaging, and visually captivating.
+SwiftCodee is a modern, front-end web application built with JavaScript and TypeScript. It provides an intuitive interface for working with Swift-related code snippets and examples via a fast, responsive UI. The app is deployed to Vercel: https://swiftcode-beta.vercel.app
 
-## Table of Contents
-
-- [SwiftCodee](#swiftcodee)
-  - [Table of Contents](#table-of-contents)
-  - [Features](#features)
-  - [Demo](#demo)
-  - [Getting Started](#getting-started)
-    - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-  - [Usage](#usage)
-  - [Technologies Used](#technologies-used)
-  - [Contributing](#contributing)
-  - [License](#license)
-
-## Features
-
-- **Real-Time Collaboration:**  
-  Build and update workspaces instantly with real-time data subscriptions.
-- **Dynamic Chat Interface:**  
-  Enjoy an interactive chat experience with extreme animations, powered by Framer Motion.
-- **Stunning UI/UX:**  
-  Experience dramatic entry and exit animations, subtle hover effects, and an overall cinematic interface.
-- **Google Authentication:**  
-  Securely sign in using Google OAuth, integrated with Convex backend for seamless user management.
-- **Modular Components:**  
-  Clean, reusable React components for Chat, Code view, Workspace history, and Sign-In Dialog.
-- **Responsive Design:**  
-  Fully responsive UI with Tailwind CSS ensuring optimal experience on any device.
+> Note: This repository is primarily JavaScript (≈95%) with some TypeScript and CSS.
 
 ## Demo
+Live demo: https://swiftcode-beta.vercel.app
 
-![SwiftCodee Demo](./demo/screenshot.png)
+## Features
+- Clean, responsive UI for editing and previewing code snippets
+- Copy / export snippet functionality
+- Lightweight, front-end-first architecture ready for deployment
+- Easy to extend: integrate additional code formats or back-end services
 
-*Check out the live demo [here](https://swiftcodee.vercel.app) (if available).*
+(If your project has specific features like live-run, code generation, or AI-enabled suggestions, list them here.)
 
-## Getting Started
+## Tech stack
+- JavaScript (primary)
+- TypeScript (partial)
+- CSS
+- Deployed on Vercel
 
-To get started with SwiftCodee, clone the repository and install the dependencies. Ensure you have Node.js and npm installed on your machine.
+## Getting started
 
-### Prerequisites
-
-- Node.js (v14 or above)
+Prerequisites
+- Node.js (v16+ recommended)
 - npm or yarn
-- Convex account & configuration (see [Convex docs](https://docs.convex.dev/))
-- Google OAuth credentials for authentication
 
-## Installation
+Install
+```bash
+# clone the repo
+git clone https://github.com/twonum/swiftcodee.git
+cd swiftcodee
 
-1. **Clone the repository:**
+# install dependencies
+npm install
+# or
+# yarn install
+```
 
-   ```bash
-   git clone https://github.com/two/swiftcodee.git
-   cd swift-code
-   ```
+Run (development)
+```bash
+npm run dev
+# or
+# npm start
+```
 
-2. **Install dependencies:**
+Build (production)
+```bash
+npm run build
+```
 
-   ```bash
-   npm install
-   # or
-   yarn install
-   ```
+Serve production build (example)
+```bash
+npm run preview
+# or use your static host of choice
+```
 
-3. **Set up environment variables:**
+## Environment / Configuration
+If the app requires environment variables (API keys, feature flags, etc.), create a `.env.local` file and add them there. Example:
+```
+# .env.local
+NEXT_PUBLIC_API_URL=https://api.example.com
+```
+(Adjust variables according to your app’s needs.)
 
-   Create a `.env.local` file in the root directory and add the required environment variables. For example:
-
-   ```env
-   NEXT_PUBLIC_CONVEX_URL=your_convex_url
-   GOOGLE_CLIENT_ID=your_google_client_id
-   ```
-
-4. **Run the development server:**
-
-   ```bash
-   npm run dev
-   # or
-   yarn dev
-   ```
-
-5. **Access the app:**
-
-   Open [http://localhost:3000](http://localhost:3000) in your browser to see SwiftCodee in action.
-
-## Usage
-
-- **Sign In:**  
-  Click on the "Sign In with Google" button in the sign-in dialog to authenticate. The sign-in dialog features extreme entry/exit animations and a dynamic main heading ("SwiftCodee") in a striking green hue.
-
-- **Chat & Code Workspace:**  
-  After signing in, you'll be directed to your workspace. Use the chat interface to interact with the AI or collaborators, and view your code updates in real-time.
-
-- **Workspace History:**  
-  Quickly navigate through your recent workspaces using the Workspace History component, which lists previous sessions with dramatic, staggered animations.
-
-## Technologies Used
-
-- **Next.js:**  
-  A powerful React framework for server-side rendering and static site generation.
-- **React:**  
-  A JavaScript library for building user interfaces.
-- **Tailwind CSS:**  
-  A utility-first CSS framework for rapid UI development.
-- **Framer Motion:**  
-  An animation library that brings life to UI elements with stunning, extreme animations.
-- **Convex:**  
-  Real-time backend as a service for managing live data and state.
-- **Google OAuth:**  
-  Secure user authentication via Google.
-- **Lucide React:**  
-  Beautiful, customizable icons for your app.
-- **Axios:**  
-  Promise-based HTTP client for interacting with external APIs.
+## Folder structure (example)
+```
+/
+├─ public/         # static assets
+├─ src/            # source code (components, pages, styles)
+├─ package.json
+└─ README.md
+```
 
 ## Contributing
+Contributions are welcome! To contribute:
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feat/your-feature`
+3. Commit your changes and push: `git push origin feat/your-feature`
+4. Open a pull request and describe what you changed
 
-Contributions are welcome! If you have suggestions or find issues, please follow these steps:
+Please open an issue for bugs or feature requests.
 
-1. Fork the repository.
-2. Create a new branch (`git checkout -b feature/your-feature`).
-3. Commit your changes (`git commit -am 'Add new feature'`).
-4. Push to the branch (`git push origin feature/your-feature`).
-5. Open a pull request.
-
-Please ensure your code adheres to the existing style and write tests for new features if possible.
+## Issues & Support
+Report issues on the repo’s Issues page: https://github.com/twonum/swiftcodee/issues
 
 ## License
+If you want a license, add one (e.g., MIT). Example:
+```
+MIT License
+Copyright (c) 2026 twonum
+```
+(Replace with the license you choose or remove this section if not applicable.)
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
----
-
-Enjoy building with SwiftCodee and feel free to reach out if you have any questions or feedback!
-
----
+## Contact
+Project home: https://swiftcode-beta.vercel.app  
+Repository: https://github.com/twonum/swiftcodee
