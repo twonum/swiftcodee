@@ -1,11 +1,11 @@
 # SwiftCodee
 
-SwiftCodee is a modern, front-end web application built with JavaScript and TypeScript. It provides an intuitive interface for working with Swift-related code snippets and examples via a fast, responsive UI. The app is deployed to Vercel: https://swiftcode-beta.vercel.app
+SwiftCodee is a modern, front-end web application built with JavaScript and TypeScript. It provides an intuitive interface for working with Swift-related code snippets and examples via a fast, responsive UI. The app is deployed to Vercel: https://swiftcodee.vercel.app
 
 > Note: This repository is primarily JavaScript (≈95%) with some TypeScript and CSS.
 
 ## Demo
-Live demo: https://swiftcode-beta.vercel.app
+Live demo: https://swiftcode-beta.vercel.app | https://swiftcodee.vercel.app
 
 ## Features
 - Clean, responsive UI for editing and previewing code snippets
